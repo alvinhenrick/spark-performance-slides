@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Spark UDF Performance</title>
+
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/white.css">
+
+    <!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="lib/css/monokai.css">
+
+    <!-- Printing and PDF exports -->
+    <script>
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = window.location.search.match(/print-pdf/gi) ? 'css/print/pdf.css' : 'css/print/paper.css';
+        document.getElementsByTagName('head')[0].appendChild(link);
+    </script>
+    <style>
+        .reveal .slides section .fragment.current-only {
+            opacity: 1;
+            visibility: visible;
+            display: none;
+        }
+
+        .reveal .slides section .fragment.current-only.current-fragment {
+            display: block;
+        }
+
+        /* Solarized Light theme */
+        .line {
+            display: block;
+        }
+
+        .line.focus {
+            background: #f5f5f5;
+            color: #657b83;
+            width: max-content;
+        }
+
+    </style>
+</head>
+<body>
+<div class="reveal">
+    <div class="slides">
+        <section>
+            <h4>UDF Performance Comparison</h4>
+            <img class="plain" src="images/UDFPerformance1.png"/>
+        </section>
+        <section>
+            <h4>UDF Star Expansion : Identify the problem</h4>
+            <pre><code data-trim>
+                    == Physical Plan ==
+                    *(1) Project [input_col#0, pythonUDF0#6L AS output_col#3L]
+                    +- BatchEvalPython [word_count_udf(input_col#0)], [input_col#0, pythonUDF0#6L]
+                       +- Scan ExistingRDD[input_col#0]
+
+                    == Physical Plan ==
+                    *(1) Project [input_col#22, UDF:word_count(input_col#22) AS output_col#24L]
+                    +- Scan ExistingRDD[input_col#22]
+
+                    == Physical Plan ==
+                    *(1) Project [input_col#41, pythonUDF0#47L AS output_col#44L]
+                    +- ArrowEvalPython [word_count_pandas_udf(input_col#41)], [input_col#41, pythonUDF0#47L]
+                       +- Scan ExistingRDD[input_col#41]
+
+                    == Physical Plan ==
+                    *(1) Project [input_col#63, size(split(input_col#63,  )) AS output_col#65]
+                    +- Scan ExistingRDD[input_col#63]
+            </code></pre>
+            <p class="fragment current-only" data-code-focus="3">Python UDF</p>
+            <p class="fragment current-only" data-code-focus="7">Scala UDF</p>
+            <p class="fragment current-only" data-code-focus="12">Pandas UDF</p>
+            <p class="fragment current-only" data-code-focus="16">Inbuilt UDF</p>
+        </section>
+
+        <section>
+            <h4>UDF Star Expansion : Multiple Invocation</h4>
+            <img class="plain" src="images/UDFPerformance2StarExpansion.png"/>
+        </section>
+        <section>
+            <h4>Filter Preceding UDF : Multiple Invocation</h4>
+            <img class="plain" src="images/UDFPerformance3Filter.png"/>
+        </section>
+        <section>
+            <h4>WithColumn vs Select : Parsing and Analysing the DAG </h4>
+            <img class="plain" src="images/WithColumnVsSelect.png"/>
+        </section>
+    </div>
+</div>
+
+<script src="js/reveal.js"></script>
+
+<script>
+    // More info about config & dependencies:
+    // - https://github.com/hakimel/reveal.js#configuration
+    // - https://github.com/hakimel/reveal.js#dependencies
+    Reveal.initialize({
+        dependencies: [
+            {src: 'plugin/markdown/marked.js'},
+            {src: 'plugin/markdown/markdown.js'},
+            {src: 'plugin/notes/notes.js', async: true},
+            {src: 'plugin/highlight/highlight.js', async: true},
+            {
+                src: 'plugin/reveal-code-focus/reveal-code-focus.js',
+                async: true,
+                callback: function () {
+                    RevealCodeFocus();
+                }
+            }
+        ],
+        slideNumber: true
+    });
+</script>
+</body>
+</html>
