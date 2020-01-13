@@ -49,12 +49,14 @@
 <div class="reveal">
     <div class="slides">
         <section>
-            <h4>UDF Performance Comparison</h4>
+            <h5>UDF Performance Comparison</h5>
             <img class="plain" src="images/UDFPerformance1.png"/>
         </section>
+
         <section>
-            <h4>UDF Star Expansion : Identify the problem</h4>
-            <pre><code data-trim>
+            <h3>UDF Performance Comparison</h3>
+            <h5>Identify in Explain Plan</h5>
+            <pre><code class="hljs oxygene" data-trim>
                     == Physical Plan ==
                     *(1) Project [input_col#0, pythonUDF0#6L AS output_col#3L]
                     +- BatchEvalPython [word_count_udf(input_col#0)], [input_col#0, pythonUDF0#6L]
@@ -80,17 +82,137 @@
         </section>
 
         <section>
-            <h4>UDF Star Expansion : Multiple Invocation</h4>
+            <h3>UDF Star Expansion</h3>
+            <h5>Multiple Invocation</h5>
             <img class="plain" src="images/UDFPerformance2StarExpansion.png"/>
         </section>
+
         <section>
-            <h4>Filter Preceding UDF : Multiple Invocation</h4>
+            <h3>UDF Star Expansion</h3>
+            <h5>Identify the problem</h5>
+            <pre><code class="hljs oxygene" data-trim>
+                    == Physical Plan ==
+                    *(1) Project [pythonUDF2#13.sign_x AS sign_x#5, pythonUDF2#13.exp_x AS exp_x#6, pythonUDF2#13.tanh_x AS tanh_x#7]
+                    +- BatchEvalPython [start_expansion_udf(input_col#0L), start_expansion_udf(input_col#0L), start_expansion_udf(input_col#0L)], [input_col#0L, pythonUDF0#11, pythonUDF1#12, pythonUDF2#13]
+                       +- Scan ExistingRDD[input_col#0L]
+
+                    == Physical Plan ==
+                    *(1) Project [output_col2#17.sign_x AS sign_x#19, output_col2#17.exp_x AS exp_x#20, output_col2#17.tanh_x AS tanh_x#21]
+                    +- *(1) Project [pythonUDF0#25 AS output_col2#17]
+                       +- BatchEvalPython [lambda(input_col#14L)], [input_col#14L, pythonUDF0#25]
+                          +- Scan ExistingRDD[input_col#14L]
+
+                    == Physical Plan ==
+                    *(1) Project [output_col2#4.sign_x AS sign_x#6, output_col2#4.exp_x AS exp_x#7, output_col2#4.tanh_x AS tanh_x#8]
+                    +- *(1) Project [output_col2#4]
+                       +- Generate explode(array(pythonUDF0#12)), [pythonUDF0#12], false, [output_col2#4]
+                          +- BatchEvalPython [start_expansion_udf(input_col#0L)], [input_col#0L, pythonUDF0#12]
+                             +- Scan ExistingRDD[input_col#0L]
+            </code></pre>
+            <p class="fragment current-only" data-code-focus="3">Invoked 3 times</p>
+            <p class="fragment current-only" data-code-focus="9">Invoked 1 time call adjusted to lambda</p>
+            <p class="fragment current-only" data-code-focus="15-16">Invoked 1 time but over head of wrapped in array
+                and explode</p>
+        </section>
+
+        <section>
+            <h3>Filter Preceding UDF</h3>
+            <h5>Multiple Invocation</h5>
             <img class="plain" src="images/UDFPerformance3Filter.png"/>
         </section>
+
         <section>
-            <h4>WithColumn vs Select : Parsing and Analysing the DAG </h4>
+            <h3>Filter Preceding UDF</h3>
+            <h5>Identify the problem</h5>
+            <pre><code class="hljs oxygene" data-trim>
+                == Physical Plan ==
+                *(2) Project [input_col#0, pythonUDF0#7 AS word#3]
+                +- BatchEvalPython [first_word_udf(input_col#0)], [input_col#0, pythonUDF0#7]
+                   +- *(1) Project [input_col#0]
+                      +- *(1) Filter isnotnull(pythonUDF0#6)
+                         +- BatchEvalPython [first_word_udf(input_col#0)], [input_col#0, pythonUDF0#6]
+                            +- Scan ExistingRDD[input_col#0]
+
+                == Physical Plan ==
+                *(1) Filter isnotnull(word2#20)
+                +- *(1) Project [input_col#17, pythonUDF0#23 AS word2#20]
+                   +- BatchEvalPython [lambda(input_col#17)], [input_col#17, pythonUDF0#23]
+                      +- Scan ExistingRDD[input_col#17]
+            </code></pre>
+            <p class="fragment current-only" data-code-focus="3-6">Invoked 2 times</p>
+            <p class="fragment current-only" data-code-focus="12">Invoked 1 time call adjusted to lambda</p>
+        </section>
+
+        <section>
+            <h3>WithColumn vs Select</h3>
+            <h5>Parsing and Analysing the DAG</h5>
             <img class="plain" src="images/WithColumnVsSelect.png"/>
         </section>
+
+        <section>
+            <h3>WithColumn vs Select</h3>
+            <h5>Identify the problem</h5>
+            <pre><code class="hljs oxygene" data-trim>
+                    == Parsed Logical Plan ==
+                    Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, test_6#92, test_7#101, test_8#111, null AS test_9#122]
+                    +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, test_6#92, test_7#101, null AS test_8#111]
+                       +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, test_6#92, null AS test_7#101]
+                          +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, null AS test_6#92]
+                             +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, null AS test_5#84]
+                                +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, null AS test_4#77]
+                                   +- Project [input_col#57, test_0#59, test_1#62, test_2#66, null AS test_3#71]
+                                      +- Project [input_col#57, test_0#59, test_1#62, null AS test_2#66]
+                                         +- Project [input_col#57, test_0#59, null AS test_1#62]
+                                            +- Project [input_col#57, null AS test_0#59]
+                                               +- LogicalRDD [input_col#57], false
+
+                    == Analyzed Logical Plan ==
+                    input_col: string, test_0: null, test_1: null, test_2: null, test_3: null, test_4: null, test_5: null, test_6: null, test_7: null, test_8: null, test_9: null
+                    Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, test_6#92, test_7#101, test_8#111, null AS test_9#122]
+                    +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, test_6#92, test_7#101, null AS test_8#111]
+                       +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, test_6#92, null AS test_7#101]
+                          +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, test_5#84, null AS test_6#92]
+                             +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, test_4#77, null AS test_5#84]
+                                +- Project [input_col#57, test_0#59, test_1#62, test_2#66, test_3#71, null AS test_4#77]
+                                   +- Project [input_col#57, test_0#59, test_1#62, test_2#66, null AS test_3#71]
+                                      +- Project [input_col#57, test_0#59, test_1#62, null AS test_2#66]
+                                         +- Project [input_col#57, test_0#59, null AS test_1#62]
+                                            +- Project [input_col#57, null AS test_0#59]
+                                               +- LogicalRDD [input_col#57], false
+
+                    == Optimized Logical Plan ==
+                    Project [input_col#57, null AS test_0#59, null AS test_1#62, null AS test_2#66, null AS test_3#71, null AS test_4#77, null AS test_5#84, null AS test_6#92, null AS test_7#101, null AS test_8#111, null AS test_9#122]
+                    +- LogicalRDD [input_col#57], false
+
+                    == Physical Plan ==
+                    *(1) Project [input_col#57, null AS test_0#59, null AS test_1#62, null AS test_2#66, null AS test_3#71, null AS test_4#77, null AS test_5#84, null AS test_6#92, null AS test_7#101, null AS test_8#111, null AS test_9#122]
+                    +- Scan ExistingRDD[input_col#57]
+            </code></pre>
+        </section>
+
+        <section>
+            <h3>WithColumn vs Select</h3>
+            <h5>Fix the problem</h5>
+            <pre><code class="hljs oxygene" data-trim>
+                    == Parsed Logical Plan ==
+                    Project [*, null AS test_0#2, null AS test_1#3, null AS test_2#4, null AS test_3#5, null AS test_4#6, null AS test_5#7, null AS test_6#8, null AS test_7#9, null AS test_8#10, null AS test_9#11]
+                    +- LogicalRDD [input_col#0], false
+
+                    == Analyzed Logical Plan ==
+                    input_col: string, test_0: null, test_1: null, test_2: null, test_3: null, test_4: null, test_5: null, test_6: null, test_7: null, test_8: null, test_9: null
+                    Project [input_col#0, null AS test_0#2, null AS test_1#3, null AS test_2#4, null AS test_3#5, null AS test_4#6, null AS test_5#7, null AS test_6#8, null AS test_7#9, null AS test_8#10, null AS test_9#11]
+                    +- LogicalRDD [input_col#0], false
+
+                    == Optimized Logical Plan ==
+                    Project [input_col#0, null AS test_0#2, null AS test_1#3, null AS test_2#4, null AS test_3#5, null AS test_4#6, null AS test_5#7, null AS test_6#8, null AS test_7#9, null AS test_8#10, null AS test_9#11]
+                    +- LogicalRDD [input_col#0], false
+
+                    == Physical Plan ==
+                    *(1) Project [input_col#0, null AS test_0#2, null AS test_1#3, null AS test_2#4, null AS test_3#5, null AS test_4#6, null AS test_5#7, null AS test_6#8, null AS test_7#9, null AS test_8#10, null AS test_9#11]
+                    +- Scan ExistingRDD[input_col#0]
+            </code></pre>
+        </section>
+
     </div>
 </div>
 
